@@ -4,15 +4,31 @@ This crate is designed to test a client and server sending data to each other th
 
 ## Building
 
+### Windows, MacOS, Linux x86
+
 ```shell
 # For Windows, MacOS, Linux, etc.
 cargo build --release
-# For embedded systems, use cross
+```
+
+### Cross compiling for Armv7 embedded
+
+#### Cross method
+
+```shell
+# For embedded systems, use cross for simplicity
 cargo install cross
-# 64 bit armv7, for example
-cross build --target armv7-unknown-linux-gnueabi
-# 32 bit armv7
-cross build --target armv7-unknown-linux-gnueabihf
+# 32-bit armv7, for 64-bit remove the hf at the end
+cross build --release --target armv7-unknown-linux-gnueabihf
+```
+
+#### Non-cross (haven't tested)
+
+```shell
+# Add target, -gnueabi without hf for 64-bit
+rustup target add armv7-unknown-linux-gnueabihf
+sudo apt-get install gcc-arm-linux-gnueabihf
+cargo build --release --target armv7-unknown-linux-gnueabihf
 ```
 
 ## Usage
