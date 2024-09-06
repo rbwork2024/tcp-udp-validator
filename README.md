@@ -2,6 +2,19 @@
 
 This crate is designed to test a client and server sending data to each other through TCP. A warning will be thrown if the SHA256 checksum fails on the recipient, and a `NACK` will be sent back to the sender. The expected response is an `ACK`.
 
+## Building
+
+```shell
+# For Windows, MacOS, Linux, etc.
+cargo build --release
+# For embedded systems, use cross
+cargo install cross
+# 64 bit armv7, for example
+cross build --target armv7-unknown-linux-gnueabi
+# 32 bit armv7
+cross build --target armv7-unknown-linux-gnueabihf
+```
+
 ## Usage
 
 ### On the recipient
