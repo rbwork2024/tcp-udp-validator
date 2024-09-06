@@ -33,17 +33,17 @@ cargo build --release --target armv7-unknown-linux-gnueabihf
 
 ## Usage
 
-### On the recipient
+### On the client
 
 ```shell
 # Use the IP address you'd like to attempt connecting to
-usb-validator receiver 127.0.0.1:8080
+usb-validator client 127.0.0.1:8080
 ```
 
-### On the sender
+### On the server
 ```shell
 # Use the IP address you'd like to bind to
-tcp-validator sender 0.0.0.0:8080
+tcp-validator server 0.0.0.0:8080
 ```
 
 ## Additional arguments
@@ -56,8 +56,8 @@ Simple program to validate data sent through TCP
 Usage: tcp-validator.exe [OPTIONS] <UNIT> <ADDRESS>        
 
 Arguments:
-  <UNIT>     Whether to run as sender or receiver [possible values: sender, receiver]
-  <ADDRESS>  Bind address for the sender, and connection address for the receiver Example(sender): 0.0.0.0:8080, Example(receiver): 127.0.0.1:8080
+  <UNIT>     Whether to run as server or client [possible values: server, client]
+  <ADDRESS>  Bind address for the server, and connection address for the client Example(server): 0.0.0.0:8080, Example(client): 127.0.0.1:8080
 
 Options:
       --log-level <LOG_LEVEL>  Define a log level (default=Warn) [possible values: warn, info, debug, trace]
