@@ -29,7 +29,7 @@ pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow
     let mut ack = [0; 4];
     socket.read_exact(&mut ack).await?;
     if &ack == b"ACK\0" {
-        log::info!("Client acknowledged data receipt.");
+        log::debug!("Client acknowledged data receipt.");
     } else {
         log::warn!("Client failed to acknowledge.");
         if abort_on_fail {
@@ -63,7 +63,7 @@ pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> any
 
     // Validate checksum
     if &calculated_checksum[..] == received_checksum {
-        log::info!("Data integrity verified!");
+        log::debug!("Data integrity verified!");
         socket.write_all(b"ACK\0").await?;
     } else {
         log::warn!("Data corruption detected!");

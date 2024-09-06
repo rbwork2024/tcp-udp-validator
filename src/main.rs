@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use env_logger::Env;
 use tokio::net::UdpSocket;
@@ -12,25 +13,23 @@ async fn run_udp_server(
     abort_on_fail: bool,
 ) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
-    socket.connect(send_addr).await?;
-    log::info!("UDP connected!");
+    let mut prev_success = false;
     loop {
-        udp::sender_logic(&mut socket, send_addr, abort_on_fail).await?;
-        udp::recipient_logic(&mut socket, send_addr, abort_on_fail).await?;
+        if udp::sender_logic(&mut socket, send_addr, abort_on_fail, prev_success).await?
+            && !prev_success
+        {
+            prev_success = true;
+        }
     }
 }
 
-async fn run_udp_client(
-    bind_addr: &str,
-    send_addr: &str,
-    abort_on_fail: bool,
-) -> anyhow::Result<()> {
+async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
-    socket.connect(send_addr).await?;
-    log::info!("UDP connected!");
+    let mut prev_success = false;
     loop {
-        udp::recipient_logic(&mut socket, send_addr, abort_on_fail).await?;
-        udp::sender_logic(&mut socket, send_addr, abort_on_fail).await?;
+        if udp::recipient_logic(&mut socket, abort_on_fail, prev_success).await? && !prev_success {
+            prev_success = true;
+        }
     }
 }
 
@@ -40,7 +39,6 @@ async fn run_server(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     log::info!("TCP: Client connected!");
     loop {
         tcp::sender_logic(&mut socket, abort_on_fail).await?;
-        tcp::recipient_logic(&mut socket, abort_on_fail).await?;
     }
 }
 
@@ -49,7 +47,6 @@ async fn run_client(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     log::info!("TCP: Connected to server!");
     loop {
         tcp::recipient_logic(&mut socket, abort_on_fail).await?;
-        tcp::sender_logic(&mut socket, abort_on_fail).await?;
     }
 }
 
@@ -60,7 +57,7 @@ struct Cli {
     /// Connection type. Use either tcp or udp
     #[command(subcommand)]
     connection_type: ConnectionType,
-    /// Define a log level (default=Warn)
+    /// Define a log level (default=info)
     #[arg(long)]
     log_level: Option<LogLevel>,
     /// Abort on failure
@@ -83,9 +80,9 @@ enum ConnectionType {
         /// Bind address for the server/client
         /// Example(server): 0.0.0.0:8080, Example(client): 0.0.0.0:8081
         bind_address: String,
-        /// Send address for the server/client
-        /// Example(server): 127.0.0.1:8081, Example(client): 127.0.0.1:8080
-        connection_address: String,
+        /// Send address for the server. Will be unused for client
+        /// Example(server): 127.0.0.1:8081
+        send_address: Option<String>,
     },
 }
 
@@ -118,7 +115,7 @@ enum Unit {
 async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     env_logger::Builder::from_env(
-        Env::default().default_filter_or(args.log_level.map_or("warn", |level| level.to_str())),
+        Env::default().default_filter_or(args.log_level.map_or("info", |level| level.to_str())),
     )
     .init();
     log::warn!("Selected a log level where you can see warnings!");
@@ -138,13 +135,31 @@ async fn main() -> anyhow::Result<()> {
         ConnectionType::Udp {
             unit: Unit::Server,
             bind_address,
-            connection_address,
-        } => run_udp_server(&bind_address, &connection_address, args.abort_on_fail).await?,
+            send_address,
+        } => {
+            run_udp_server(
+                &bind_address,
+                if send_address.is_some() {
+                    send_address.as_deref().unwrap()
+                } else {
+                    return Err(anyhow!(
+                        "The UDP server MUST specify a send address to send data to."
+                    ));
+                },
+                args.abort_on_fail,
+            )
+            .await?
+        }
         ConnectionType::Udp {
             unit: Unit::Client,
             bind_address,
-            connection_address,
-        } => run_udp_client(&bind_address, &connection_address, args.abort_on_fail).await?,
+            send_address,
+        } => {
+            if send_address.is_some() {
+                log::warn!("As a UDP client, send_address will be ignored!");
+            }
+            run_udp_client(&bind_address, args.abort_on_fail).await?
+        }
     }
     Ok(())
 }

@@ -55,8 +55,8 @@ tcp-validator tcp server 0.0.0.0:8080
 ### On the client
 
 ```shell
-# Provide the IP address you'd like to bind to, AND the IP address you'd like to connect to
-usb-validator udp client 0.0.0.0:8081 127.0.0.1:8080
+# Provide the IP address you'd like to bind to
+usb-validator udp client 0.0.0.0:8081
 ```
 
 ### On the server
@@ -80,7 +80,7 @@ Commands:
   help  Print this message or the help of the given subcommand(s)
 
 Options:
-      --log-level <LOG_LEVEL>  Define a log level (default=Warn) [possible values: warn, info, debug, trace]
+      --log-level <LOG_LEVEL>  Define a log level (default=info) [possible values: warn, info, debug, trace]
       --abort-on-fail          Abort on failure
   -h, --help                   Print help
   -V, --version                Print version
@@ -89,12 +89,12 @@ Options:
 ### Help (UDP)
 
 ```
-Usage: tcp-udp-validator.exe udp <UNIT> <BIND_ADDRESS> <CONNECTION_ADDRESS>
+Usage: tcp-udp-validator.exe udp <UNIT> <BIND_ADDRESS> [SEND_ADDRESS]
 
 Arguments:
-  <UNIT>                Whether to run as server or client (UDP) [possible values: server, client]
-  <BIND_ADDRESS>        Bind address for the server/client Example(server): 0.0.0.0:8080, Example(client): 0.0.0.0:8081
-  <CONNECTION_ADDRESS>  Send address for the server/client Example(server): 127.0.0.1:8081, Example(client): 127.0.0.1:8080
+  <UNIT>          Whether to run as server or client (UDP) [possible values: server, client]
+  <BIND_ADDRESS>  Bind address for the server/client Example(server): 0.0.0.0:8080, Example(client): 0.0.0.0:8081     
+  [SEND_ADDRESS]  Send address for the server. Will be unused for client Example(server): 127.0.0.1:8081
 
 Options:
   -h, --help  Print help
