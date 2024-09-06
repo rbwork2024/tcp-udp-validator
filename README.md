@@ -1,6 +1,6 @@
-# TCP-validator
+# TCP-UDP-validator
 
-This crate is designed to test a client and server sending data to each other through TCP. A warning will be thrown if the SHA256 checksum fails on the recipient, and a `NACK` will be sent back to the sender. The expected response is an `ACK`.
+This crate is designed to test a client and server sending data to each other through TCP or UDP. A warning will be thrown if the SHA256 checksum fails on the recipient, and a `NACK` will be sent back to the sender. The expected response is an `ACK`.
 
 ## Building
 
@@ -31,19 +31,38 @@ sudo apt-get install gcc-arm-linux-gnueabihf
 cargo build --release --target armv7-unknown-linux-gnueabihf
 ```
 
-## Usage
+## Usage (TCP)
 
 ### On the client
 
 ```shell
 # Use the IP address you'd like to attempt connecting to
-usb-validator client 127.0.0.1:8080
+usb-validator tcp client 127.0.0.1:8080
 ```
 
 ### On the server
 ```shell
 # Use the IP address you'd like to bind to
-tcp-validator server 0.0.0.0:8080
+tcp-validator tcp server 0.0.0.0:8080
+```
+
+## Usage (UDP)
+
+> **NOTE:** UDP is expected to have more data integrity failures since it is a stateless connection-less protocol. TCP has built-in checksums and ordered delivery guarantees. Since the protocol doesn't check for reliable delivery, out-of-order packets and dropped packets can occur! This program currently does not check for out-of-order or dropped packets, but the checksums will check the integrity of the packets themselves.
+
+> **WARNING:** Start the client first! Or else you might get an error like `Error: An existing connection was forcibly closed by the remote host. (os error 10054)`
+
+### On the client
+
+```shell
+# Provide the IP address you'd like to bind to, AND the IP address you'd like to connect to
+usb-validator udp client 0.0.0.0:8081 127.0.0.1:8080
+```
+
+### On the server
+```shell
+# Provide the IP address you'd like to bind to, AND the IP address you'd like to connect to
+tcp-validator udp server 0.0.0.0:8080 127.0.0.1:8081
 ```
 
 ## Additional arguments
@@ -51,13 +70,14 @@ tcp-validator server 0.0.0.0:8080
 > **Note:** Run `tcp-validator --help` to see the latest arguments, this is probably not out of date but just in case!
 
 ```
-Simple program to validate data sent through TCP
+Simple program to validate data sent through TCP or UDP
 
-Usage: tcp-validator.exe [OPTIONS] <UNIT> <ADDRESS>        
+Usage: tcp-udp-validator.exe [OPTIONS] <COMMAND>
 
-Arguments:
-  <UNIT>     Whether to run as server or client [possible values: server, client]
-  <ADDRESS>  Bind address for the server, and connection address for the client Example(server): 0.0.0.0:8080, Example(client): 127.0.0.1:8080
+Commands:
+  tcp
+  udp
+  help  Print this message or the help of the given subcommand(s)
 
 Options:
       --log-level <LOG_LEVEL>  Define a log level (default=Warn) [possible values: warn, info, debug, trace]
@@ -65,3 +85,34 @@ Options:
   -h, --help                   Print help
   -V, --version                Print version
 ```
+
+### Help (UDP)
+
+```
+Usage: tcp-udp-validator.exe udp <UNIT> <BIND_ADDRESS> <CONNECTION_ADDRESS>
+
+Arguments:
+  <UNIT>                Whether to run as server or client (UDP) [possible values: server, client]
+  <BIND_ADDRESS>        Bind address for the server/client Example(server): 0.0.0.0:8080, Example(client): 0.0.0.0:8081
+  <CONNECTION_ADDRESS>  Send address for the server/client Example(server): 127.0.0.1:8081, Example(client): 127.0.0.1:8080
+
+Options:
+  -h, --help  Print help
+```
+
+### Help (TCP)
+
+```
+Usage: tcp-udp-validator.exe tcp <UNIT> <ADDRESS>
+
+Arguments:
+  <UNIT>     Whether to run as server or client (TCP) [possible values: server, client]
+  <ADDRESS>  Bind address for the server, and connection address for the client Example(server): 0.0.0.0:8080, Example(client): 127.0.0.1:8080
+
+Options:
+  -h, --help  Print help
+```
+
+## Issues
+
+Report issues at <https://github.com/rbwork2024/tcp-udp-validator/issues/>!

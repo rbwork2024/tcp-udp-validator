@@ -1,6 +1,6 @@
 [package]
-name = "tcp-validator"
-version = "0.1.0"
+name = "tcp-udp-validator"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["Ryan Brue <ryan.brue@enovationcontrols.com>"]
