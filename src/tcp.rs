@@ -5,7 +5,7 @@ use tokio::{
     net::TcpStream,
 };
 
-pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<()> {
+pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<bool> {
     let mut data = [0u8; 1024];
     rand::thread_rng().fill(&mut data);
     // Calculate the checksum using SHA256
@@ -30,16 +30,17 @@ pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow
     socket.read_exact(&mut ack).await?;
     if &ack == b"ACK\0" {
         log::debug!("Client acknowledged data receipt.");
+        Ok(true)
     } else {
         log::warn!("Client failed to acknowledge.");
         if abort_on_fail {
             return Err(anyhow::anyhow!("Data corruption detected"));
         }
+        Ok(false)
     }
-    Ok(())
 }
 
-pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<()> {
+pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<bool> {
     // Receive data
     let mut buffer = [0; 2048];
     let n = socket.read(&mut buffer).await?;
@@ -65,12 +66,13 @@ pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> any
     if &calculated_checksum[..] == received_checksum {
         log::debug!("Data integrity verified!");
         socket.write_all(b"ACK\0").await?;
+        Ok(true)
     } else {
         log::warn!("Data corruption detected!");
         socket.write_all(b"NACK\0").await?;
         if abort_on_fail {
             return Err(anyhow::anyhow!("Data corruption detected"));
         }
+        Ok(false)
     }
-    Ok(())
 }

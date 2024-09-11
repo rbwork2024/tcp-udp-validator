@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use env_logger::Env;
@@ -7,6 +9,8 @@ use tokio::net::{TcpListener, TcpStream};
 mod tcp;
 mod udp;
 
+const REFRESH_INTERVAL: u64 = 1000;
+
 async fn run_udp_server(
     bind_addr: &str,
     send_addr: &str,
@@ -14,11 +18,29 @@ async fn run_udp_server(
 ) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
     let mut prev_success = false;
+    let mut success_counter: u64 = 0;
+    let mut failure_counter: u64 = 0;
+    print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
-        if udp::sender_logic(&mut socket, send_addr, abort_on_fail, prev_success).await?
-            && !prev_success
-        {
-            prev_success = true;
+        let mut update = false;
+        if udp::sender_logic(&mut socket, send_addr, abort_on_fail, prev_success).await? {
+            if !prev_success {
+                prev_success = true;
+            }
+            success_counter += 1;
+            if success_counter % REFRESH_INTERVAL == 0 {
+                update = true;
+            }
+        } else {
+            failure_counter += 1;
+            update = true;
+        }
+        if update {
+            print!(
+                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                success_counter, failure_counter
+            );
+            std::io::stdout().flush().unwrap();
         }
     }
 }
@@ -26,27 +48,87 @@ async fn run_udp_server(
 async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
     let mut prev_success = false;
+    let mut success_counter: u64 = 0;
+    let mut failure_counter: u64 = 0;
+    print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
-        if udp::recipient_logic(&mut socket, abort_on_fail, prev_success).await? && !prev_success {
-            prev_success = true;
+        let mut update = false;
+        if udp::recipient_logic(&mut socket, abort_on_fail, prev_success).await? {
+            if !prev_success {
+                prev_success = true;
+            }
+            success_counter += 1;
+            if success_counter % REFRESH_INTERVAL == 0 {
+                update = true;
+            }
+        } else {
+            failure_counter += 1;
+            update = true;
+        }
+        if update {
+            print!(
+                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                success_counter, failure_counter
+            );
+            std::io::stdout().flush().unwrap();
         }
     }
 }
 
 async fn run_server(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
+    log::info!("TCP: Waiting for connection to client!");
     let (mut socket, _) = listener.accept().await?;
-    log::info!("TCP: Client connected!");
+    log::info!("TCP: Server connected to client!");
+    let mut success_counter: u64 = 0;
+    let mut failure_counter: u64 = 0;
+    print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
-        tcp::sender_logic(&mut socket, abort_on_fail).await?;
+        let mut update = false;
+        if tcp::sender_logic(&mut socket, abort_on_fail).await? {
+            success_counter += 1;
+            if success_counter % REFRESH_INTERVAL == 0 {
+                update = true;
+            }
+        } else {
+            failure_counter += 1;
+            update = true;
+        }
+        if update {
+            print!(
+                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                success_counter, failure_counter
+            );
+            std::io::stdout().flush().unwrap();
+        }
     }
 }
 
 async fn run_client(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
+    log::info!("TCP: Waiting for connection to server!");
     let mut socket = TcpStream::connect(addr).await?;
-    log::info!("TCP: Connected to server!");
+    log::info!("TCP: Client connected to server!");
+    let mut success_counter: u64 = 0;
+    let mut failure_counter: u64 = 0;
+    print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
-        tcp::recipient_logic(&mut socket, abort_on_fail).await?;
+        let mut update = false;
+        if tcp::recipient_logic(&mut socket, abort_on_fail).await? {
+            success_counter += 1;
+            if success_counter % REFRESH_INTERVAL == 0 {
+                update = true;
+            }
+        } else {
+            failure_counter += 1;
+            update = true;
+        }
+        if update {
+            print!(
+                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                success_counter, failure_counter
+            );
+            std::io::stdout().flush().unwrap();
+        }
     }
 }
 
