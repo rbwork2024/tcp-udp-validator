@@ -133,8 +133,10 @@ async fn run_client(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
 }
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-/// Simple program to validate data sent through TCP or UDP
+#[command(version, about, long_about)]
+/// Simple program to validate data sent through TCP or UDP.
+/// 
+/// View the source here: https://github.com/rbwork2024/tcp-udp-validator
 struct Cli {
     /// Connection type. Use either tcp or udp
     #[command(subcommand)]

@@ -1,8 +1,9 @@
 [package]
 name = "tcp-udp-validator"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/rbwork2024/tcp-udp-validator"
 authors = ["Ryan Brue <ryan.brue@enovationcontrols.com>"]
 
 [dependencies]
