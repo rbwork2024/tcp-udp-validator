@@ -2,7 +2,7 @@
 Description=TCP/UDP validator service
 
 [Service]
-ExecStart=/usr/bin/tcp-udp-validator tcp server 0.0.0.0:8080
+ExecStart=/usr/bin/tcp-udp-validator -p tcp server 0.0.0.0:8080
 Restart=always
 
 [Install]

@@ -36,7 +36,7 @@ async fn run_udp_server(
         }
         if update {
             print!(
-                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                "\rSuccessful: {} | Unsuccessful: {}",
                 success_counter, failure_counter
             );
             std::io::stdout().flush().unwrap();
@@ -66,7 +66,7 @@ async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<
         }
         if update {
             print!(
-                "\r# successful packets: {} :: # unsuccessful packets: {}",
+                "\rSuccessful: {} | Unsuccessful: {}",
                 success_counter, failure_counter
             );
             std::io::stdout().flush().unwrap();
@@ -74,23 +74,28 @@ async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<
     }
 }
 
-async fn run_server(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
+fn print_and_log(stuff: &str, print: bool) {
+    log::info!(
+        "[{}] {}",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+        stuff
+    );
+    if print {
+        println!(
+            "[{}] {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            stuff
+        );
+    }
+}
+
+async fn run_server(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
-    println!(
-        "[{}] Waiting for connection to client!",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
+    print_and_log("Waiting for connection to client!", print);
     let (mut socket, _) = listener.accept().await?;
-    println!(
-        "[{}] Connected!",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
+    print_and_log("Connected!", print);
     let mut success_counter: u64 = 0;
     let mut failure_counter: u64 = 0;
-    println!(
-        "[{}] # successful packets: 0 :: # unsuccessful packets: 0",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
     loop {
         let mut update = false;
         match tcp::sender_logic(&mut socket, abort_on_fail).await {
@@ -105,27 +110,23 @@ async fn run_server(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
                     update = true;
                 }
                 if update {
-                    println!(
-                        "[{}] # successful packets: {} :: # unsuccessful packets: {}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        success_counter,
-                        failure_counter
+                    print_and_log(
+                        &format!(
+                            "Successful: {} | Unsuccessful: {}",
+                            success_counter, failure_counter
+                        ),
+                        print,
                     );
-                    std::io::stdout().flush().unwrap();
                 }
             }
             Err(e) => {
-                println!(
-                    "[{}] There was a problem with the connection: {}",
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    e
+                print_and_log(
+                    &format!("There was a problem with the connection: {}", e),
+                    print,
                 );
                 let mut connected = false;
                 while !connected {
-                    println!(
-                        "[{}] Attempting to reconnect...",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-                    );
+                    print_and_log("Attempting to reconnect...", print);
                     if let Ok((s, _)) = listener.accept().await {
                         socket = s;
                         connected = true;
@@ -136,22 +137,12 @@ async fn run_server(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
     }
 }
 
-async fn run_client(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
-    println!(
-        "[{}] Waiting for connection to server!",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
+async fn run_client(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Result<()> {
+    print_and_log("Waiting for connection to server!", print);
     let mut socket = TcpStream::connect(addr).await?;
-    println!(
-        "[{}] Connected!",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
+    print_and_log("Connected!", print);
     let mut success_counter: u64 = 0;
     let mut failure_counter: u64 = 0;
-    println!(
-        "[{}] # successful packets: 0 :: # unsuccessful packets: 0",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    );
     loop {
         let mut update = false;
         match tcp::recipient_logic(&mut socket, abort_on_fail).await {
@@ -166,27 +157,23 @@ async fn run_client(addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
                     update = true;
                 }
                 if update {
-                    println!(
-                        "[{}] # successful packets: {} :: # unsuccessful packets: {}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        success_counter,
-                        failure_counter
+                    print_and_log(
+                        &format!(
+                            "Successful: {} | Unsuccessful: {}",
+                            success_counter, failure_counter
+                        ),
+                        print,
                     );
-                    std::io::stdout().flush().unwrap();
                 }
             }
             Err(e) => {
-                println!(
-                    "[{}] There was a problem with the connection: {}",
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    e
+                print_and_log(
+                    &format!("There was a problem with the connection: {}", e),
+                    print,
                 );
                 let mut connected = false;
                 while !connected {
-                    println!(
-                        "[{}] Attempting to reconnect...",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-                    );
+                    print_and_log("Attempting to reconnect...", print);
                     if let Ok(s) = TcpStream::connect(addr).await {
                         socket = s;
                         connected = true;
@@ -209,6 +196,9 @@ struct Cli {
     /// Abort on failure
     #[arg(long)]
     abort_on_fail: bool,
+    /// In addition to logging, print
+    #[arg(short)]
+    print: bool,
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -240,16 +230,19 @@ enum Unit {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
     let args = Cli::parse();
     match args.connection_type {
         ConnectionType::Tcp {
             unit: Unit::Server,
             address,
-        } => run_server(&address, args.abort_on_fail).await?,
+        } => run_server(&address, args.abort_on_fail, args.print).await?,
         ConnectionType::Tcp {
             unit: Unit::Client,
             address,
-        } => run_client(&address, args.abort_on_fail).await?,
+        } => run_client(&address, args.abort_on_fail, args.print).await?,
         ConnectionType::Udp {
             unit: Unit::Server,
             bind_address,
