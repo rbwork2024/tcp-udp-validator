@@ -5,7 +5,7 @@ use tokio::{
     net::TcpStream,
 };
 
-pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<bool> {
+pub async fn sender_logic(socket: &mut TcpStream) -> anyhow::Result<bool> {
     let mut data = [0u8; 1024];
     rand::thread_rng().fill(&mut data);
     // Calculate the checksum using SHA256
@@ -22,14 +22,12 @@ pub async fn sender_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow
     if &ack == b"ACK\0" {
         Ok(true)
     } else {
-        if abort_on_fail {
-            return Err(anyhow::anyhow!("Data corruption detected"));
-        }
+        log::error!("Data corruption detected");
         Ok(false)
     }
 }
 
-pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> anyhow::Result<bool> {
+pub async fn recipient_logic(socket: &mut TcpStream) -> anyhow::Result<bool> {
     // Receive data
     let mut buffer = [0; 2048];
     let n = socket.read(&mut buffer).await?;
@@ -46,9 +44,7 @@ pub async fn recipient_logic(socket: &mut TcpStream, abort_on_fail: bool) -> any
         Ok(true)
     } else {
         socket.write_all(b"NACK\0").await?;
-        if abort_on_fail {
-            return Err(anyhow::anyhow!("Data corruption detected"));
-        }
+        log::error!("Data corruption detected");
         Ok(false)
     }
 }

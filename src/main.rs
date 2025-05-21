@@ -10,11 +10,7 @@ mod udp;
 
 const REFRESH_INTERVAL: u64 = 10000;
 
-async fn run_udp_server(
-    bind_addr: &str,
-    send_addr: &str,
-    abort_on_fail: bool,
-) -> anyhow::Result<()> {
+async fn run_udp_server(bind_addr: &str, send_addr: &str) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
     let mut prev_success = false;
     let mut success_counter: u64 = 0;
@@ -22,7 +18,7 @@ async fn run_udp_server(
     print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
         let mut update = false;
-        if udp::sender_logic(&mut socket, send_addr, abort_on_fail, prev_success).await? {
+        if udp::sender_logic(&mut socket, send_addr, prev_success).await? {
             if !prev_success {
                 prev_success = true;
             }
@@ -44,7 +40,7 @@ async fn run_udp_server(
     }
 }
 
-async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<()> {
+async fn run_udp_client(bind_addr: &str) -> anyhow::Result<()> {
     let mut socket = UdpSocket::bind(bind_addr).await?;
     let mut prev_success = false;
     let mut success_counter: u64 = 0;
@@ -52,7 +48,7 @@ async fn run_udp_client(bind_addr: &str, abort_on_fail: bool) -> anyhow::Result<
     print!("# successful packets: 0 :: # unsuccessful packets: 0");
     loop {
         let mut update = false;
-        if udp::recipient_logic(&mut socket, abort_on_fail, prev_success).await? {
+        if udp::recipient_logic(&mut socket, prev_success).await? {
             if !prev_success {
                 prev_success = true;
             }
@@ -89,7 +85,7 @@ fn print_and_log(stuff: &str, print: bool) {
     }
 }
 
-async fn run_server(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Result<()> {
+async fn run_server(addr: &str, print: bool) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     print_and_log("Waiting for connection to client!", print);
     let (mut socket, _) = listener.accept().await?;
@@ -98,7 +94,7 @@ async fn run_server(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Res
     let mut failure_counter: u64 = 0;
     loop {
         let mut update = false;
-        match tcp::sender_logic(&mut socket, abort_on_fail).await {
+        match tcp::sender_logic(&mut socket).await {
             Ok(result) => {
                 if result {
                     success_counter += 1;
@@ -137,7 +133,7 @@ async fn run_server(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Res
     }
 }
 
-async fn run_client(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Result<()> {
+async fn run_client(addr: &str, print: bool) -> anyhow::Result<()> {
     print_and_log("Waiting for connection to server!", print);
     let mut socket = TcpStream::connect(addr).await?;
     print_and_log("Connected!", print);
@@ -145,7 +141,7 @@ async fn run_client(addr: &str, abort_on_fail: bool, print: bool) -> anyhow::Res
     let mut failure_counter: u64 = 0;
     loop {
         let mut update = false;
-        match tcp::recipient_logic(&mut socket, abort_on_fail).await {
+        match tcp::recipient_logic(&mut socket).await {
             Ok(result) => {
                 if result {
                     success_counter += 1;
@@ -193,9 +189,6 @@ struct Cli {
     /// Connection type. Use either tcp or udp
     #[command(subcommand)]
     connection_type: ConnectionType,
-    /// Abort on failure
-    #[arg(long)]
-    abort_on_fail: bool,
     /// In addition to logging, print
     #[arg(short)]
     print: bool,
@@ -238,11 +231,11 @@ async fn main() -> anyhow::Result<()> {
         ConnectionType::Tcp {
             unit: Unit::Server,
             address,
-        } => run_server(&address, args.abort_on_fail, args.print).await?,
+        } => run_server(&address, args.print).await?,
         ConnectionType::Tcp {
             unit: Unit::Client,
             address,
-        } => run_client(&address, args.abort_on_fail, args.print).await?,
+        } => run_client(&address, args.print).await?,
         ConnectionType::Udp {
             unit: Unit::Server,
             bind_address,
@@ -257,7 +250,6 @@ async fn main() -> anyhow::Result<()> {
                         "The UDP server MUST specify a send address to send data to."
                     ));
                 },
-                args.abort_on_fail,
             )
             .await?
         }
@@ -272,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
                     chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
                 );
             }
-            run_udp_client(&bind_address, args.abort_on_fail).await?
+            run_udp_client(&bind_address).await?
         }
     }
     Ok(())

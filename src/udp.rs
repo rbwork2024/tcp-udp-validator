@@ -7,7 +7,6 @@ use tokio::net::UdpSocket;
 pub async fn sender_logic(
     socket: &mut UdpSocket,
     send_addr: &str,
-    abort_on_fail: bool,
     prev_success: bool,
 ) -> anyhow::Result<bool> {
     let mut data = [0u8; 1024];
@@ -42,18 +41,12 @@ pub async fn sender_logic(
         }
         Ok(true)
     } else {
-        if abort_on_fail {
-            return Err(anyhow::anyhow!("Data corruption detected"));
-        }
+        log::error!("Data corruption detected");
         Ok(false)
     }
 }
 
-pub async fn recipient_logic(
-    socket: &mut UdpSocket,
-    abort_on_fail: bool,
-    prev_success: bool,
-) -> anyhow::Result<bool> {
+pub async fn recipient_logic(socket: &mut UdpSocket, prev_success: bool) -> anyhow::Result<bool> {
     // Receive data
     let mut buffer = [0; 2048];
     let timeout = tokio::time::timeout(Duration::from_secs(1), socket.recv_from(&mut buffer)).await;
@@ -85,9 +78,7 @@ pub async fn recipient_logic(
         Ok(true)
     } else {
         socket.send_to(b"NACK\0", sender).await?;
-        if abort_on_fail {
-            return Err(anyhow::anyhow!("Data corruption detected"));
-        }
+        log::error!("Data corruption detected");
         Ok(false)
     }
 }
