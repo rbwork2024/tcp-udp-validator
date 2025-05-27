@@ -1,184 +1,9 @@
-use std::io::Write;
-
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
-use tokio::net::UdpSocket;
-use tokio::net::{TcpListener, TcpStream};
 
 mod tcp;
 mod udp;
-
-const REFRESH_INTERVAL: u64 = 10000;
-
-async fn run_udp_server(bind_addr: &str, send_addr: &str) -> anyhow::Result<()> {
-    let mut socket = UdpSocket::bind(bind_addr).await?;
-    let mut prev_success = false;
-    let mut success_counter: u64 = 0;
-    let mut failure_counter: u64 = 0;
-    print!("# successful packets: 0 :: # unsuccessful packets: 0");
-    loop {
-        let mut update = false;
-        if udp::sender_logic(&mut socket, send_addr, prev_success).await? {
-            if !prev_success {
-                prev_success = true;
-            }
-            success_counter += 1;
-            if success_counter % REFRESH_INTERVAL == 0 {
-                update = true;
-            }
-        } else {
-            failure_counter += 1;
-            update = true;
-        }
-        if update {
-            print!(
-                "\rSuccessful: {} | Unsuccessful: {}",
-                success_counter, failure_counter
-            );
-            std::io::stdout().flush().unwrap();
-        }
-    }
-}
-
-async fn run_udp_client(bind_addr: &str) -> anyhow::Result<()> {
-    let mut socket = UdpSocket::bind(bind_addr).await?;
-    let mut prev_success = false;
-    let mut success_counter: u64 = 0;
-    let mut failure_counter: u64 = 0;
-    print!("# successful packets: 0 :: # unsuccessful packets: 0");
-    loop {
-        let mut update = false;
-        if udp::recipient_logic(&mut socket, prev_success).await? {
-            if !prev_success {
-                prev_success = true;
-            }
-            success_counter += 1;
-            if success_counter % REFRESH_INTERVAL == 0 {
-                update = true;
-            }
-        } else {
-            failure_counter += 1;
-            update = true;
-        }
-        if update {
-            print!(
-                "\rSuccessful: {} | Unsuccessful: {}",
-                success_counter, failure_counter
-            );
-            std::io::stdout().flush().unwrap();
-        }
-    }
-}
-
-fn print_and_log(stuff: &str, print: bool) {
-    log::info!(
-        "[{}] {}",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        stuff
-    );
-    if print {
-        println!(
-            "[{}] {}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            stuff
-        );
-    }
-}
-
-async fn run_server(addr: &str, print: bool) -> anyhow::Result<()> {
-    let listener = TcpListener::bind(addr).await?;
-    print_and_log("Waiting for connection to client!", print);
-    let (mut socket, _) = listener.accept().await?;
-    print_and_log("Connected!", print);
-    let mut success_counter: u64 = 0;
-    let mut failure_counter: u64 = 0;
-    loop {
-        let mut update = false;
-        match tcp::sender_logic(&mut socket).await {
-            Ok(result) => {
-                if result {
-                    success_counter += 1;
-                    if success_counter % REFRESH_INTERVAL == 0 {
-                        update = true;
-                    }
-                } else {
-                    failure_counter += 1;
-                    update = true;
-                }
-                if update {
-                    print_and_log(
-                        &format!(
-                            "Successful: {} | Unsuccessful: {}",
-                            success_counter, failure_counter
-                        ),
-                        print,
-                    );
-                }
-            }
-            Err(e) => {
-                print_and_log(
-                    &format!("There was a problem with the connection: {}", e),
-                    print,
-                );
-                let mut connected = false;
-                while !connected {
-                    print_and_log("Attempting to reconnect...", print);
-                    if let Ok((s, _)) = listener.accept().await {
-                        socket = s;
-                        connected = true;
-                    }
-                }
-            }
-        }
-    }
-}
-
-async fn run_client(addr: &str, print: bool) -> anyhow::Result<()> {
-    print_and_log("Waiting for connection to server!", print);
-    let mut socket = TcpStream::connect(addr).await?;
-    print_and_log("Connected!", print);
-    let mut success_counter: u64 = 0;
-    let mut failure_counter: u64 = 0;
-    loop {
-        let mut update = false;
-        match tcp::recipient_logic(&mut socket).await {
-            Ok(result) => {
-                if result {
-                    success_counter += 1;
-                    if success_counter % REFRESH_INTERVAL == 0 {
-                        update = true;
-                    }
-                } else {
-                    failure_counter += 1;
-                    update = true;
-                }
-                if update {
-                    print_and_log(
-                        &format!(
-                            "Successful: {} | Unsuccessful: {}",
-                            success_counter, failure_counter
-                        ),
-                        print,
-                    );
-                }
-            }
-            Err(e) => {
-                print_and_log(
-                    &format!("There was a problem with the connection: {}", e),
-                    print,
-                );
-                let mut connected = false;
-                while !connected {
-                    print_and_log("Attempting to reconnect...", print);
-                    if let Ok(s) = TcpStream::connect(addr).await {
-                        socket = s;
-                        connected = true;
-                    }
-                }
-            }
-        }
-    }
-}
+pub(crate) mod util;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about)]
@@ -231,17 +56,17 @@ async fn main() -> anyhow::Result<()> {
         ConnectionType::Tcp {
             unit: Unit::Server,
             address,
-        } => run_server(&address, args.print).await?,
+        } => tcp::run_server(&address, args.print).await?,
         ConnectionType::Tcp {
             unit: Unit::Client,
             address,
-        } => run_client(&address, args.print).await?,
+        } => tcp::run_client(&address, args.print).await?,
         ConnectionType::Udp {
             unit: Unit::Server,
             bind_address,
             send_address,
         } => {
-            run_udp_server(
+            udp::run_udp_server(
                 &bind_address,
                 if send_address.is_some() {
                     send_address.as_deref().unwrap()
@@ -250,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
                         "The UDP server MUST specify a send address to send data to."
                     ));
                 },
+                args.print,
             )
             .await?
         }
@@ -264,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                     chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
                 );
             }
-            run_udp_client(&bind_address).await?
+            udp::run_udp_client(&bind_address, args.print).await?
         }
     }
     Ok(())
